@@ -1,0 +1,826 @@
+---
+name: muhidcasestudy
+description: Generate a complete, production-ready case study page from PRD/BRD and designer story. Produces scroll-driven storytelling with granular reveal animations, PDF export, and image placeholders.
+version: "2.0.0"
+author: muhidul
+---
+
+# MuhidCaseStudy — Case Study Generator v2
+
+> **OpenCode usage:** Run `/muhidcasestudy` in OpenCode, or ask "generate a case study" with your PRD/BRD as context.
+
+
+# MuhidCaseStudy — Case Study Generator v2
+
+Generates a production-grade, scroll-driven case study page from raw project inputs (PRD, BRD, designer story). Output is a self-contained React component with granular reveal animations, PDF export support, and image placeholders the user swaps out later.
+
+Works inside `~/portfolio-react` OR as a standalone React project.
+
+---
+
+## Stack & Design System
+
+- **Framework:** React 19 + Vite + Tailwind CSS v4 + Framer Motion
+- **Fonts:** Instrument Serif (display/headings) + Inter (body). Load via Google Fonts in `index.html`.
+- **Colors:** neutral-900/100 text · #0E0E0E dark bg · white light bg
+- **Accent:** one per project — pick from green, blue, amber, rose, violet. Use consistently.
+- **Animation system:** scroll-driven `whileInView` reveals, staggered per-element delays. NO single wrapper revealing a whole section at once.
+- **Breakpoints:** mobile-first, `md:` prefix for ≥768px
+
+---
+
+## Step 1 — Gather Inputs
+
+Collect everything before writing a line of code. Ask if missing.
+
+### Required
+1. **PRD / BRD** — goals, success metrics, user problems, functional requirements, constraints
+   - If Google Doc URL given: use `mcp__claude_ai_Google_Drive__read_file_content` with the fileId
+   - Read ALL tabs/sections of Google Docs
+2. **Designer story** — the human narrative:
+   - What was broken and why did it matter?
+   - What research was done (interviews, analytics, shadowing)?
+   - What was explored, iterated, or cut?
+   - The 2–3 key design decisions and reasoning
+   - What shipped vs. what was left out
+   - Post-launch results and metrics
+3. **Project metadata:**
+   - Company, year, timeline (e.g. "12 weeks")
+   - Team: PM, Eng count, QA, other designers
+   - Platform: iOS / Android / Web / Cross-platform
+   - Status: Live · In progress · Concept
+
+### Optional (use placeholders if absent)
+- Hero image: 2400×1028px (21:9)
+- Wide flow/exploration images: 2400×1050px (16:7)
+- Portrait phone screens: 800×1422px (9:16)
+- Any screen recordings or prototype links (describe as text callouts)
+
+---
+
+## Step 2 — Synthesize the Structure
+
+Map inputs to this 15-section spine. Omit sections with no content. Add custom sections if the story needs them.
+
+```
+1.  HERO          — Title (serif, split-word animated) + tagline + meta pills + hero image
+2.  IMPACT STATS  — 4 key metrics, immediately after hero (serif number + mono label)
+3.  OVERVIEW      — 2-col: Role/Team/Timeline/Status LEFT · Project brief RIGHT (per-row stagger)
+4.  CONTEXT       — Market narrative + data table (numbers that prove scale/problem)
+5.  PROBLEM       — 2 numbered user/stakeholder problem cards with quotes
+6.  PROCESS       — 4–5 phase horizontal timeline: Discover → Define → Design → Deliver → Iterate
+7.  RESEARCH      — 3 insight cards (tag + headline + body)
+8.  EXPLORATION   — Wide image placeholder (lo-fi wireframes / early explorations)
+9.  FLOW COMPARE  — Before vs After: step lists, drop-off highlighted in before, cleaner after
+10. DECISIONS     — 2–3 decision blocks each in 3-col grid [Problem | Decision | Outcome]
+11. FINAL DESIGN  — Wide flow image + portrait phone screen grid (user journey steps)
+12. CALLOUT       — Dark inverted section: key feature / innovation / safety proof point
+13. IMPACT        — Large metric + supporting stat cards + narrative paragraph
+14. REFLECTIONS   — 3 numbered learnings (serif number + title + body)
+15. FOOTER NAV    — Next project link + "View all work" back to home
+```
+
+---
+
+## Step 3 — Animation System (use exactly as shown)
+
+Every element reveals individually. Never animate a whole section block at once.
+
+```jsx
+const ease = [0.22, 1, 0.36, 1]
+
+// Standard text/content reveal
+function Reveal({ children, delay = 0, className = '', distance = 36 }) {
+  const [done, setDone] = useState(false)
+  return (
+    <motion.div
+      className={className}
+      initial={{ opacity: 0, y: distance }}
+      whileInView={{ opacity: 1, y: 0 }}
+      viewport={{ once: true, margin: '-80px' }}
+      transition={{ duration: 1.4, ease, delay }}
+      style={{ willChange: done ? 'auto' : 'transform, opacity', backfaceVisibility: 'hidden', WebkitBackfaceVisibility: 'hidden' }}
+      onAnimationComplete={() => setDone(true)}
+    >
+      {children}
+    </motion.div>
+  )
+}
+
+// Image reveal (overflow-hidden built in)
+function RevealImage({ children, delay = 0, className = '' }) {
+  const [done, setDone] = useState(false)
+  return (
+    <motion.div
+      className={`overflow-hidden ${className}`}
+      initial={{ opacity: 0, y: 36 }}
+      whileInView={{ opacity: 1, y: 0 }}
+      viewport={{ once: true, margin: '-80px' }}
+      transition={{ duration: 1.4, ease, delay }}
+      style={{ willChange: done ? 'auto' : 'transform, opacity', backfaceVisibility: 'hidden', WebkitBackfaceVisibility: 'hidden' }}
+      onAnimationComplete={() => setDone(true)}
+    >
+      {children}
+    </motion.div>
+  )
+}
+
+// Grid of cards where each child staggers in
+function RevealGridItem({ children, delay }) {
+  const [done, setDone] = useState(false)
+  return (
+    <motion.div
+      className="h-full"
+      initial={{ opacity: 0, y: 36 }}
+      whileInView={{ opacity: 1, y: 0 }}
+      viewport={{ once: true, margin: '-80px' }}
+      transition={{ duration: 1.4, ease, delay }}
+      style={{ willChange: done ? 'auto' : 'transform, opacity', backfaceVisibility: 'hidden', WebkitBackfaceVisibility: 'hidden' }}
+      onAnimationComplete={() => setDone(true)}
+    >
+      {children}
+    </motion.div>
+  )
+}
+
+function RevealGrid({ children, className = '', baseDelay = 0, stagger = 0.1 }) {
+  const items = Children.toArray(children)
+  return (
+    <div className={className}>
+      {items.map((child, i) => (
+        <RevealGridItem key={i} delay={baseDelay + i * stagger}>
+          {child}
+        </RevealGridItem>
+      ))}
+    </div>
+  )
+}
+
+// Hero headline: each word slides up individually
+function SplitWords({ text, className = '', style = {}, delay = 0, as: Tag = 'h2' }) {
+  const ref = useRef(null)
+  const inView = useInView(ref, { once: true, margin: '-5%' })
+  const [done, setDone] = useState(false)
+  const words = text.split(' ')
+  return (
+    <Tag ref={ref} className={className} style={style}>
+      {words.map((word, i) => (
+        <span key={i} className="inline-block overflow-hidden leading-[1.1]">
+          <motion.span
+            className="inline-block"
+            initial={{ y: '105%', opacity: 0 }}
+            animate={inView ? { y: '0%', opacity: 1 } : {}}
+            transition={{ duration: 1.4, ease, delay: delay + i * 0.08 }}
+            style={{ willChange: done ? 'auto' : 'transform, opacity', backfaceVisibility: 'hidden', WebkitBackfaceVisibility: 'hidden' }}
+            onAnimationComplete={i === words.length - 1 ? () => setDone(true) : undefined}
+          >
+            {word}
+          </motion.span>
+          {i < words.length - 1 ? ' ' : null}
+        </span>
+      ))}
+    </Tag>
+  )
+}
+```
+
+### Stagger Rules
+- **Overview left col** metadata rows: delays `0.06, 0.14, 0.22, 0.30, 0.38`
+- **Overview right col** paragraphs: separate `<Reveal>` per `<p>`, delays `0.08, 0.15, 0.25, 0.35`
+- **Context right col** stat rows: individual `<Reveal>` per row, delays `0.08, 0.18, 0.28, 0.38`
+- **Problem cards:** `0.05, 0.18`
+- **Process phases:** `0.0, 0.08, 0.16, 0.24, 0.32`
+- **Insight cards:** `0.0, 0.1, 0.2`
+- **Decision blocks (3-col per decision):** `0.05, 0.12, 0.20`
+- **Learnings:** `0.05, 0.15, 0.25`
+- **Hero entry (initial animate, not whileInView):** eyebrow `0.2`, headline line 1 `0.3`, line 2 `0.54`, subtext `0.7`, hero image `0.85`
+
+---
+
+## Step 4 — Image Placeholder Component
+
+Use for ALL image slots. User replaces `src` when images are ready.
+
+```jsx
+function ImagePlaceholder({ label, aspectRatio = '16/9', className = '' }) {
+  return (
+    <div
+      className={`w-full bg-neutral-100 dark:bg-neutral-900 rounded-2xl flex flex-col items-center justify-center gap-3 border border-dashed border-neutral-300 dark:border-neutral-700 ${className}`}
+      style={{ aspectRatio }}
+    >
+      <svg className="w-8 h-8 text-neutral-300 dark:text-neutral-700" fill="none" stroke="currentColor" strokeWidth="1.5" viewBox="0 0 24 24">
+        <rect x="3" y="3" width="18" height="18" rx="2"/>
+        <path d="M3 9h18M9 21V9"/>
+      </svg>
+      <span className="text-xs font-mono text-neutral-400 dark:text-neutral-600 text-center px-6 leading-relaxed">
+        {label}
+      </span>
+    </div>
+  )
+}
+```
+
+---
+
+## Step 5 — PDF Export
+
+Add a print button to the sticky nav. Add `@media print` styles to suppress animations and show clean layout.
+
+### Print button in nav:
+```jsx
+<button
+  onClick={() => window.print()}
+  className="hidden md:flex items-center gap-1.5 text-xs font-mono text-neutral-400 hover:text-neutral-700 dark:hover:text-neutral-200 transition-colors print:hidden"
+>
+  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+    <path d="M6 9V2h12v7M6 18H4a2 2 0 01-2-2v-5a2 2 0 012-2h16a2 2 0 012 2v5a2 2 0 01-2 2h-2M6 14h12v8H6z"/>
+  </svg>
+  Export PDF
+</button>
+```
+
+### Add to component's `<style>` tag or a `<GlobalStyles>` / `index.css`:
+```css
+@media print {
+  nav { display: none !important; }
+  .print\:hidden { display: none !important; }
+  * { animation: none !important; transition: none !important; }
+  [style*="opacity: 0"] { opacity: 1 !important; }
+  [style*="transform"] { transform: none !important; }
+  body { background: white !important; color: black !important; }
+  .dark { background: white !important; color: black !important; }
+  section { page-break-inside: avoid; }
+  h1, h2, h3 { page-break-after: avoid; }
+}
+```
+
+For better PDF output, inject a `<style>` tag dynamically before printing:
+```jsx
+const handlePrint = () => {
+  const style = document.createElement('style')
+  style.id = '__print_override'
+  style.textContent = `@media print { * { opacity: 1 !important; transform: none !important; } }`
+  document.head.appendChild(style)
+  window.print()
+  setTimeout(() => document.getElementById('__print_override')?.remove(), 1000)
+}
+```
+
+---
+
+## Step 6 — Component Template
+
+```jsx
+import { useEffect, useLayoutEffect, useRef, useState, Children } from 'react'
+import { flushSync } from 'react-dom'
+import { Link } from 'react-router-dom'
+import { motion, useInView } from 'framer-motion'
+
+const ease = [0.22, 1, 0.36, 1]
+
+// --- Animation primitives (paste from Step 3) ---
+// Reveal, RevealImage, RevealGridItem, RevealGrid, SplitWords
+
+// --- ImagePlaceholder (paste from Step 4) ---
+
+// --- All data as const arrays at the top — no inline data in JSX ---
+const stats = [
+  { value: '...', unit: '...', label: '...' },
+  // 4 total
+]
+
+const problems = [
+  { num: '01', who: '...', headline: '...', body: '...', quote: '"..."', quoteBy: '— ...' },
+  { num: '02', who: '...', headline: '...', body: '...', quote: '"..."', quoteBy: '— ...' },
+]
+
+const processPhases = [
+  { phase: 'Discover', duration: 'Wk 1–2', icon: '◎', items: ['...'] },
+  { phase: 'Define',   duration: 'Wk 3',   icon: '◈', items: ['...'] },
+  { phase: 'Design',   duration: 'Wk 4–8', icon: '◇', items: ['...'] },
+  { phase: 'Deliver',  duration: 'Wk 9+',  icon: '◆', items: ['...'] },
+]
+
+const insights = [
+  { tag: '...', insight: '...', body: '...' },
+  { tag: '...', insight: '...', body: '...' },
+  { tag: '...', insight: '...', body: '...' },
+]
+
+const decisions = [
+  { label: 'Decision 01', title: '...', problem: '...', solution: '...', impact: '...' },
+  { label: 'Decision 02', title: '...', problem: '...', solution: '...', impact: '...' },
+]
+
+const learnings = [
+  { num: '01', title: '...', body: '...' },
+  { num: '02', title: '...', body: '...' },
+  { num: '03', title: '...', body: '...' },
+]
+
+export default function ProjectNameCaseStudy() {
+  const [ready, setReady] = useState(false)
+
+  useLayoutEffect(() => {
+    window.history.scrollRestoration = 'manual'
+    window.scrollTo({ top: 0, behavior: 'instant' })
+    flushSync(() => setReady(true))
+  }, [])
+
+  useEffect(() => {
+    document.title = 'Project Name — Designer Name'
+    return () => { document.title = 'Designer Name — Product Designer' }
+  }, [])
+
+  const handlePrint = () => {
+    const style = document.createElement('style')
+    style.id = '__print_override'
+    style.textContent = `@media print { * { opacity: 1 !important; transform: none !important; } }`
+    document.head.appendChild(style)
+    window.print()
+    setTimeout(() => document.getElementById('__print_override')?.remove(), 1000)
+  }
+
+  if (!ready) return null
+
+  return (
+    <div className="bg-white dark:bg-[#0E0E0E] text-neutral-900 dark:text-neutral-100 min-h-screen">
+
+      {/* ─── Sticky nav ─── */}
+      <nav className="sticky top-0 z-40 bg-white/90 dark:bg-[#0E0E0E]/90 backdrop-blur-md print:hidden">
+        <div className="max-w-5xl mx-auto px-6 py-4 flex items-center justify-between">
+          <Link to="/" className="flex items-center gap-2 text-sm text-neutral-500 hover:text-neutral-900 dark:hover:text-neutral-100 transition-colors font-mono">
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+              <path d="M19 12H5M5 12l7-7M5 12l7 7"/>
+            </svg>
+            Back
+          </Link>
+          <span className="text-xs font-mono text-neutral-400 dark:text-neutral-500 uppercase tracking-widest">Case Study</span>
+          <button onClick={handlePrint} className="hidden md:flex items-center gap-1.5 text-xs font-mono text-neutral-400 hover:text-neutral-700 dark:hover:text-neutral-200 transition-colors">
+            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+              <path d="M6 9V2h12v7M6 18H4a2 2 0 01-2-2v-5a2 2 0 012-2h16a2 2 0 012 2v5a2 2 0 01-2 2h-2M6 14h12v8H6z"/>
+            </svg>
+            Export PDF
+          </button>
+        </div>
+      </nav>
+
+      {/* ─── Hero ─── */}
+      <header className="max-w-5xl mx-auto px-6 pt-16 pb-12">
+        <motion.p
+          className="text-xs font-mono text-neutral-400 dark:text-neutral-500 uppercase tracking-widest mb-6"
+          initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 1.4, ease, delay: 0.2 }}
+          style={{ willChange: 'transform, opacity', backfaceVisibility: 'hidden' }}
+        >
+          Company · Year
+        </motion.p>
+        <h1 className="font-serif font-normal leading-tight mb-6 text-neutral-900 dark:text-neutral-100 text-[28px] md:text-[45px]">
+          <SplitWords text="First line of title" as="span" className="block" delay={0.3} />
+          <SplitWords text="Second line of title" as="span" className="block" delay={0.54} />
+        </h1>
+        <motion.p
+          className="text-neutral-500 dark:text-neutral-400 max-w-2xl leading-relaxed text-base mb-8"
+          initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 1.4, ease, delay: 0.7 }}
+          style={{ willChange: 'transform, opacity', backfaceVisibility: 'hidden' }}
+        >
+          One paragraph tagline. What problem, what was built, what changed.
+        </motion.p>
+        {/* Meta pills */}
+        <motion.div className="flex flex-wrap gap-2 mb-10"
+          initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 1.4, ease, delay: 0.85 }}
+          style={{ willChange: 'transform, opacity', backfaceVisibility: 'hidden' }}
+        >
+          {['Platform · Year', 'Senior Product Designer', 'Timeline', 'Status'].map(pill => (
+            <span key={pill} className="text-xs font-mono px-3 py-1.5 rounded-full border border-neutral-200 dark:border-neutral-700 text-neutral-500 dark:text-neutral-400">
+              {pill}
+            </span>
+          ))}
+        </motion.div>
+        {/* Hero image */}
+        <RevealImage delay={0.9}>
+          <ImagePlaceholder label="Hero image · 2400 × 1028px" aspectRatio="21/9" className="rounded-2xl" />
+        </RevealImage>
+      </header>
+
+      <div className="max-w-5xl mx-auto px-6 space-y-24 pb-32">
+
+        {/* ─── Impact stats ─── */}
+        <section>
+          <RevealGrid className="grid grid-cols-2 md:grid-cols-4 gap-4" baseDelay={0} stagger={0.08}>
+            {stats.map(s => (
+              <div key={s.label} className="rounded-2xl border border-neutral-100 dark:border-neutral-800 p-6">
+                <p className="font-serif text-[36px] md:text-[48px] leading-none text-neutral-900 dark:text-neutral-100 mb-1">{s.value}</p>
+                <p className="text-xs font-mono text-neutral-400 dark:text-neutral-500 uppercase tracking-widest mb-2">{s.unit}</p>
+                <p className="text-sm text-neutral-500 dark:text-neutral-400">{s.label}</p>
+              </div>
+            ))}
+          </RevealGrid>
+        </section>
+
+        <hr className="border-neutral-100 dark:border-neutral-800" />
+
+        {/* ─── Overview ─── */}
+        <section>
+          <div className="grid md:grid-cols-[1fr_2fr] gap-12 md:gap-20">
+            {/* Left — meta */}
+            <div className="space-y-0">
+              <Reveal delay={0.06}><p className="text-xs font-mono text-neutral-400 dark:text-neutral-500 uppercase tracking-widest mb-1">Role</p><p className="text-sm text-neutral-700 dark:text-neutral-300 mb-5">Senior Product Designer</p></Reveal>
+              <Reveal delay={0.14}><p className="text-xs font-mono text-neutral-400 dark:text-neutral-500 uppercase tracking-widest mb-1">Team</p><p className="text-sm text-neutral-700 dark:text-neutral-300 mb-5">1 PM · 4 Eng · 1 QA</p></Reveal>
+              <Reveal delay={0.22}><p className="text-xs font-mono text-neutral-400 dark:text-neutral-500 uppercase tracking-widest mb-1">Timeline</p><p className="text-sm text-neutral-700 dark:text-neutral-300 mb-5">12 weeks</p></Reveal>
+              <Reveal delay={0.30}><p className="text-xs font-mono text-neutral-400 dark:text-neutral-500 uppercase tracking-widest mb-1">Platform</p><p className="text-sm text-neutral-700 dark:text-neutral-300 mb-5">iOS · Android</p></Reveal>
+              <Reveal delay={0.38}><p className="text-xs font-mono text-neutral-400 dark:text-neutral-500 uppercase tracking-widest mb-1">Status</p><p className="text-sm text-neutral-700 dark:text-neutral-300">Live</p></Reveal>
+            </div>
+            {/* Right — brief */}
+            <div>
+              <Reveal delay={0.08}><h2 className="text-xs font-mono text-neutral-400 dark:text-neutral-500 uppercase tracking-widest mb-6">Overview</h2></Reveal>
+              <Reveal delay={0.15}><p className="text-neutral-600 dark:text-neutral-300 leading-relaxed mb-4">First paragraph — the product, the user, why this mattered.</p></Reveal>
+              <Reveal delay={0.25}><p className="text-neutral-600 dark:text-neutral-300 leading-relaxed mb-4">Second paragraph — the design challenge in plain terms.</p></Reveal>
+              <Reveal delay={0.35}><p className="text-neutral-600 dark:text-neutral-300 leading-relaxed">Third paragraph — scope, constraints, what success looked like.</p></Reveal>
+            </div>
+          </div>
+        </section>
+
+        <hr className="border-neutral-100 dark:border-neutral-800" />
+
+        {/* ─── Context ─── */}
+        <section>
+          <div className="grid md:grid-cols-[1fr_2fr] gap-12 md:gap-20">
+            <Reveal delay={0.05}><h2 className="text-xs font-mono text-neutral-400 dark:text-neutral-500 uppercase tracking-widest pt-1">Context</h2></Reveal>
+            <div>
+              <Reveal delay={0.1}><p className="text-neutral-600 dark:text-neutral-300 leading-relaxed mb-10">Market narrative paragraph — numbers that prove scale of problem.</p></Reveal>
+              {/* Data table */}
+              <div className="space-y-0 border-t border-neutral-100 dark:border-neutral-800">
+                {[
+                  { label: 'Market size', value: 'X users / day', source: 'Source' },
+                  { label: 'Drop-off rate', value: 'XX%', source: 'Analytics' },
+                  { label: 'Key metric', value: 'XXX', source: 'Research' },
+                  { label: 'Another stat', value: 'X×', source: 'Internal data' },
+                ].map((row, i) => (
+                  <Reveal key={row.label} delay={0.08 + i * 0.1}>
+                    <div className="grid grid-cols-[1fr_1fr] py-4 border-b border-neutral-100 dark:border-neutral-800">
+                      <span className="text-sm text-neutral-500 dark:text-neutral-400">{row.label}</span>
+                      <div>
+                        <span className="text-sm font-medium text-neutral-900 dark:text-neutral-100">{row.value}</span>
+                        <span className="text-xs text-neutral-400 dark:text-neutral-600 ml-3 font-mono">{row.source}</span>
+                      </div>
+                    </div>
+                  </Reveal>
+                ))}
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <hr className="border-neutral-100 dark:border-neutral-800" />
+
+        {/* ─── Problem ─── */}
+        <section>
+          <Reveal delay={0.05} className="mb-10"><h2 className="text-xs font-mono text-neutral-400 dark:text-neutral-500 uppercase tracking-widest">The Problem</h2></Reveal>
+          <div className="grid md:grid-cols-2 gap-6">
+            {problems.map((p, i) => (
+              <Reveal key={p.num} delay={0.05 + i * 0.13}>
+                <div className="rounded-2xl border border-neutral-100 dark:border-neutral-800 p-7 h-full">
+                  <div className="flex items-center gap-3 mb-5">
+                    <span className="font-serif text-[22px] text-neutral-300 dark:text-neutral-700">{p.num}</span>
+                    <span className="text-xs font-mono text-neutral-400 dark:text-neutral-500 uppercase tracking-widest">{p.who}</span>
+                  </div>
+                  <h3 className="text-base font-medium text-neutral-900 dark:text-neutral-100 mb-3">{p.headline}</h3>
+                  <p className="text-sm text-neutral-500 dark:text-neutral-400 leading-relaxed mb-5">{p.body}</p>
+                  <blockquote className="border-l-2 border-neutral-200 dark:border-neutral-700 pl-4 text-sm text-neutral-600 dark:text-neutral-300 italic leading-relaxed">
+                    {p.quote}
+                    <cite className="block mt-1 text-xs not-italic text-neutral-400 dark:text-neutral-600">{p.quoteBy}</cite>
+                  </blockquote>
+                </div>
+              </Reveal>
+            ))}
+          </div>
+        </section>
+
+        <hr className="border-neutral-100 dark:border-neutral-800" />
+
+        {/* ─── Process ─── */}
+        <section>
+          <Reveal delay={0.05} className="mb-10"><h2 className="text-xs font-mono text-neutral-400 dark:text-neutral-500 uppercase tracking-widest">Process</h2></Reveal>
+          <div className="grid md:grid-cols-5 gap-4">
+            {processPhases.map((ph, i) => (
+              <Reveal key={ph.phase} delay={i * 0.08}>
+                <div className="rounded-2xl border border-neutral-100 dark:border-neutral-800 p-5 h-full">
+                  <div className="flex items-center justify-between mb-4">
+                    <span className="text-xs font-mono text-neutral-400 dark:text-neutral-500">{ph.duration}</span>
+                    <span className="text-neutral-300 dark:text-neutral-600">{ph.icon}</span>
+                  </div>
+                  <h3 className="text-sm font-medium text-neutral-900 dark:text-neutral-100 mb-3">{ph.phase}</h3>
+                  <ul className="space-y-1.5">
+                    {ph.items.map(item => (
+                      <li key={item} className="text-xs text-neutral-500 dark:text-neutral-400 leading-relaxed flex gap-2">
+                        <span className="text-neutral-300 dark:text-neutral-700 shrink-0 mt-0.5">·</span>{item}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              </Reveal>
+            ))}
+          </div>
+        </section>
+
+        <hr className="border-neutral-100 dark:border-neutral-800" />
+
+        {/* ─── Research insights ─── */}
+        <section>
+          <Reveal delay={0.05} className="mb-10"><h2 className="text-xs font-mono text-neutral-400 dark:text-neutral-500 uppercase tracking-widest">Research</h2></Reveal>
+          <div className="grid md:grid-cols-3 gap-6">
+            {insights.map((ins, i) => (
+              <Reveal key={ins.insight} delay={i * 0.1}>
+                <div className="rounded-2xl bg-neutral-50 dark:bg-neutral-900 p-6 h-full">
+                  <span className="text-xs font-mono text-neutral-400 dark:text-neutral-500 uppercase tracking-widest block mb-4">{ins.tag}</span>
+                  <h3 className="text-base font-medium text-neutral-900 dark:text-neutral-100 mb-3 leading-snug">{ins.insight}</h3>
+                  <p className="text-sm text-neutral-500 dark:text-neutral-400 leading-relaxed">{ins.body}</p>
+                </div>
+              </Reveal>
+            ))}
+          </div>
+        </section>
+
+        <hr className="border-neutral-100 dark:border-neutral-800" />
+
+        {/* ─── Exploration ─── */}
+        <section>
+          <Reveal delay={0.05} className="mb-6"><h2 className="text-xs font-mono text-neutral-400 dark:text-neutral-500 uppercase tracking-widest">Exploration</h2></Reveal>
+          <RevealImage delay={0.1}>
+            <ImagePlaceholder label="Lo-fi wireframes / early explorations · 2400 × 1050px" aspectRatio="16/7" />
+          </RevealImage>
+        </section>
+
+        <hr className="border-neutral-100 dark:border-neutral-800" />
+
+        {/* ─── Flow compare ─── */}
+        <section>
+          <Reveal delay={0.05} className="mb-10"><h2 className="text-xs font-mono text-neutral-400 dark:text-neutral-500 uppercase tracking-widest">Before vs After</h2></Reveal>
+          <div className="grid md:grid-cols-2 gap-6">
+            {/* Before */}
+            <Reveal delay={0.08}>
+              <div className="rounded-2xl border border-neutral-100 dark:border-neutral-800 p-7">
+                <p className="text-xs font-mono text-neutral-400 dark:text-neutral-500 uppercase tracking-widest mb-5">Before</p>
+                <ol className="space-y-2">
+                  {['Step 1', 'Step 2 (X% drop-off)', 'Step 3', 'Step 4', 'Step 5'].map((step, i) => (
+                    <li key={i} className={`text-sm flex gap-3 items-start ${step.includes('drop-off') ? 'text-rose-500 dark:text-rose-400' : 'text-neutral-500 dark:text-neutral-400'}`}>
+                      <span className="font-mono text-xs mt-0.5 shrink-0">{String(i + 1).padStart(2, '0')}</span>
+                      {step}
+                    </li>
+                  ))}
+                </ol>
+              </div>
+            </Reveal>
+            {/* After */}
+            <Reveal delay={0.18}>
+              <div className="rounded-2xl border border-neutral-100 dark:border-neutral-800 p-7">
+                <p className="text-xs font-mono text-neutral-400 dark:text-neutral-500 uppercase tracking-widest mb-5">After</p>
+                <ol className="space-y-2">
+                  {['Step 1', 'Step 2', 'Step 3 (done)'].map((step, i) => (
+                    <li key={i} className="text-sm flex gap-3 items-start text-neutral-700 dark:text-neutral-300">
+                      <span className="font-mono text-xs mt-0.5 shrink-0 text-green-500">{String(i + 1).padStart(2, '0')}</span>
+                      {step}
+                    </li>
+                  ))}
+                </ol>
+              </div>
+            </Reveal>
+          </div>
+        </section>
+
+        <hr className="border-neutral-100 dark:border-neutral-800" />
+
+        {/* ─── Decisions ─── */}
+        <section>
+          <Reveal delay={0.05} className="mb-10"><h2 className="text-xs font-mono text-neutral-400 dark:text-neutral-500 uppercase tracking-widest">Design Decisions</h2></Reveal>
+          <div className="space-y-16">
+            {decisions.map((d, di) => (
+              <div key={d.label}>
+                <Reveal delay={0.03}><p className="text-xs font-mono text-neutral-400 dark:text-neutral-500 uppercase tracking-widest mb-4">{d.label}</p></Reveal>
+                <Reveal delay={0.08}><h3 className="text-lg md:text-xl font-medium text-neutral-900 dark:text-neutral-100 mb-6 max-w-2xl">{d.title}</h3></Reveal>
+                <div className="grid md:grid-cols-3 gap-6">
+                  <Reveal delay={0.05}>
+                    <div className="rounded-2xl bg-neutral-50 dark:bg-neutral-900 p-6">
+                      <p className="text-xs font-mono text-neutral-400 dark:text-neutral-500 uppercase tracking-widest mb-3">Problem</p>
+                      <p className="text-sm text-neutral-600 dark:text-neutral-300 leading-relaxed">{d.problem}</p>
+                    </div>
+                  </Reveal>
+                  <Reveal delay={0.12}>
+                    <div className="rounded-2xl bg-neutral-50 dark:bg-neutral-900 p-6">
+                      <p className="text-xs font-mono text-neutral-400 dark:text-neutral-500 uppercase tracking-widest mb-3">Decision</p>
+                      <p className="text-sm text-neutral-600 dark:text-neutral-300 leading-relaxed">{d.solution}</p>
+                    </div>
+                  </Reveal>
+                  <Reveal delay={0.20}>
+                    <div className="rounded-2xl bg-neutral-50 dark:bg-neutral-900 p-6">
+                      <p className="text-xs font-mono text-neutral-400 dark:text-neutral-500 uppercase tracking-widest mb-3">Outcome</p>
+                      <p className="text-sm text-neutral-600 dark:text-neutral-300 leading-relaxed">{d.impact}</p>
+                    </div>
+                  </Reveal>
+                </div>
+              </div>
+            ))}
+          </div>
+        </section>
+
+        <hr className="border-neutral-100 dark:border-neutral-800" />
+
+        {/* ─── Final design ─── */}
+        <section>
+          <Reveal delay={0.05} className="mb-6"><h2 className="text-xs font-mono text-neutral-400 dark:text-neutral-500 uppercase tracking-widest">Final Design</h2></Reveal>
+          <RevealImage delay={0.1} className="mb-6">
+            <ImagePlaceholder label="Wide flow overview · 2400 × 1050px" aspectRatio="16/7" />
+          </RevealImage>
+          {/* Phone screen grid */}
+          <RevealGrid className="grid grid-cols-3 md:grid-cols-6 gap-3 mt-6" baseDelay={0.05} stagger={0.06}>
+            {Array.from({ length: 6 }).map((_, i) => (
+              <div key={i}>
+                <ImagePlaceholder
+                  label={`Screen ${i + 1}`}
+                  aspectRatio="9/16"
+                  className="rounded-xl"
+                />
+                <p className="text-xs text-center text-neutral-400 dark:text-neutral-600 mt-2 font-mono">Label {i + 1}</p>
+              </div>
+            ))}
+          </RevealGrid>
+        </section>
+
+        <hr className="border-neutral-100 dark:border-neutral-800" />
+
+        {/* ─── Callout (dark/inverted) ─── */}
+        <section>
+          <Reveal>
+            <div className="rounded-3xl bg-neutral-900 dark:bg-white p-8 md:p-12">
+              <p className="text-xs font-mono text-neutral-400 dark:text-neutral-500 uppercase tracking-widest mb-4">Key Feature</p>
+              <h2 className="font-serif text-[28px] md:text-[38px] font-normal leading-tight text-white dark:text-neutral-900 mb-4 max-w-xl">
+                Headline for the key innovation or safety/trust proof point.
+              </h2>
+              <p className="text-neutral-400 dark:text-neutral-600 leading-relaxed max-w-xl text-base">
+                Supporting paragraph explaining why this feature was the key design decision and what it unlocked.
+              </p>
+            </div>
+          </Reveal>
+        </section>
+
+        <hr className="border-neutral-100 dark:border-neutral-800" />
+
+        {/* ─── Impact ─── */}
+        <section>
+          <Reveal delay={0.05} className="mb-10"><h2 className="text-xs font-mono text-neutral-400 dark:text-neutral-500 uppercase tracking-widest">Impact</h2></Reveal>
+          <Reveal delay={0.1} className="mb-10">
+            <p className="font-serif text-[36px] md:text-[52px] font-normal leading-tight text-neutral-900 dark:text-neutral-100 max-w-2xl">
+              The headline metric that tells the story in one number.
+            </p>
+          </Reveal>
+          <RevealGrid className="grid md:grid-cols-3 gap-4 mb-10" baseDelay={0.08} stagger={0.08}>
+            {[
+              { value: 'X%', label: 'Supporting stat 1' },
+              { value: 'X×', label: 'Supporting stat 2' },
+              { value: '+X', label: 'Supporting stat 3' },
+            ].map(s => (
+              <div key={s.label} className="rounded-2xl border border-neutral-100 dark:border-neutral-800 p-6">
+                <p className="font-serif text-[32px] text-neutral-900 dark:text-neutral-100 mb-1">{s.value}</p>
+                <p className="text-sm text-neutral-500 dark:text-neutral-400">{s.label}</p>
+              </div>
+            ))}
+          </RevealGrid>
+          <Reveal delay={0.25}><p className="text-neutral-600 dark:text-neutral-300 leading-relaxed max-w-2xl">Narrative paragraph tying the metrics back to the design decisions and the original problem.</p></Reveal>
+        </section>
+
+        <hr className="border-neutral-100 dark:border-neutral-800" />
+
+        {/* ─── Reflections ─── */}
+        <section>
+          <Reveal delay={0.05} className="mb-10"><h2 className="text-xs font-mono text-neutral-400 dark:text-neutral-500 uppercase tracking-widest">Reflections</h2></Reveal>
+          <div className="space-y-10">
+            {learnings.map((l, i) => (
+              <Reveal key={l.num} delay={0.05 + i * 0.1}>
+                <div className="grid md:grid-cols-[80px_1fr] gap-4 md:gap-10">
+                  <span className="font-serif text-[48px] md:text-[56px] leading-none text-neutral-200 dark:text-neutral-800 select-none">{l.num}</span>
+                  <div className="pt-2">
+                    <h3 className="text-base font-medium text-neutral-900 dark:text-neutral-100 mb-2">{l.title}</h3>
+                    <p className="text-sm text-neutral-500 dark:text-neutral-400 leading-relaxed">{l.body}</p>
+                  </div>
+                </div>
+              </Reveal>
+            ))}
+          </div>
+        </section>
+
+        <hr className="border-neutral-100 dark:border-neutral-800" />
+
+        {/* ─── Footer nav ─── */}
+        <section className="flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
+          <Reveal delay={0.05}>
+            <Link to="/#work" className="group flex items-center gap-3 text-sm text-neutral-500 hover:text-neutral-900 dark:hover:text-neutral-100 transition-colors">
+              <span className="text-neutral-300 dark:text-neutral-700 group-hover:text-neutral-500 transition-colors">←</span>
+              View all work
+            </Link>
+          </Reveal>
+          <Reveal delay={0.15}>
+            <Link to="/case-study/next-project" className="group flex items-center gap-3">
+              <div>
+                <p className="text-xs font-mono text-neutral-400 dark:text-neutral-500 uppercase tracking-widest mb-1">Next project</p>
+                <p className="text-base font-medium text-neutral-900 dark:text-neutral-100 group-hover:text-neutral-600 dark:group-hover:text-neutral-300 transition-colors">Next Project Name →</p>
+              </div>
+            </Link>
+          </Reveal>
+        </section>
+
+      </div>
+    </div>
+  )
+}
+```
+
+---
+
+## Step 7 — Register Route (portfolio-react only)
+
+In `src/App.jsx`:
+```jsx
+import ProjectNameCaseStudy from './pages/ProjectNameCaseStudy'
+// inside <Routes>:
+<Route path="/case-study/slug" element={<ProjectNameCaseStudy />} />
+```
+
+---
+
+## Step 8 — Add Work Card (portfolio-react only)
+
+Top of `projects` array in `src/components/Work.jsx`:
+```js
+{
+  id: 'slug',
+  year: '2025',
+  tags: ['Tag'],
+  title: 'Project Title',
+  summary: 'Two sentences: what was broken and what improved, with a metric.',
+  metrics: [{ dir: 'up', label: 'Key metric at launch' }],
+  href: '/case-study/slug',
+  img: '/selected-work-mockup-slug.webp',  // user provides later
+},
+```
+
+---
+
+## Step 9 — Build & Deploy
+
+```bash
+# Inside ~/portfolio-react:
+npm run build
+# Fix any errors (apostrophes in strings → template literals, missing imports, aspect ratio format '16/9' not 16/9)
+vercel 2>&1 | grep "url\|Preview" | head -3
+vercel alias set <preview-url> portfolio-react-xi-pink.vercel.app
+```
+
+For prod:
+```bash
+npm run build && netlify deploy --prod --dir=dist
+```
+
+---
+
+## Step 10 — Report Back
+
+Return:
+1. Staging URL + direct case study route
+2. Complete list of image placeholders with exact dimensions:
+   - Hero: `2400 × 1028px`
+   - Wide flows: `2400 × 1050px`
+   - Phone screens: `800 × 1422px`
+3. Any content that was placeholder/approximated (quote text, specific metrics) that user should verify
+
+---
+
+## Quality Checklist
+
+- [ ] `useLayoutEffect` with `flushSync` scroll-to-top (prevents flash of mid-page content)
+- [ ] `document.title` set + cleaned up on unmount
+- [ ] Every section wrapped in `<Reveal>` or individual element reveals — NO section animates all at once
+- [ ] `<hr>` between every section
+- [ ] All data in `const` arrays at top — no inline data in JSX
+- [ ] `print:hidden` on nav and PDF button
+- [ ] `handlePrint` injects style override before `window.print()`
+- [ ] Apostrophes in template literals escaped or using double quotes
+- [ ] Route registered in App.jsx
+- [ ] Work card at top of projects array
+- [ ] Build passes clean
+
+---
+
+## Writing Tone
+
+Sound like a senior designer who:
+- Leads with **why** before what
+- Uses data to prove scale (market size, drop-off %, metric changes)
+- Names specific design decisions and explains the trade-off
+- Is honest about what was cut and why
+- Avoids: "leveraged", "holistic", "seamless experience", "synergy"
+- Quotes from real research wherever possible
+- Keeps paragraphs to 2–4 sentences max
+- Reflections start with the insight name, then the lesson, then why it generalizes
